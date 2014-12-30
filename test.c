@@ -10,7 +10,7 @@ static void message_handler(struct NSQReader *rdr, struct NSQDConnection *conn, 
 {
     _DEBUG("%s: %lld, %d, %s, %lu, %.*s\n", __FUNCTION__, msg->timestamp, msg->attempts, msg->id,
         msg->body_length, (int)msg->body_length, msg->body);
-
+    printf("%s\n",msg->body );
     buffer_reset(conn->command_buf);
     nsq_finish(conn->command_buf, msg->id);
     buffered_socket_write_buffer(conn->bs, conn->command_buf);
@@ -21,17 +21,21 @@ static void message_handler(struct NSQReader *rdr, struct NSQDConnection *conn, 
 
     free_nsq_message(msg);
 }
-
+static void disconnect_handler(struct NSQReader *rdr,struct NSQDConnection *conn){
+    printf("reader dissconnected\n");
+}
 int main(int argc, char **argv)
 {
     struct NSQReader *rdr;
     struct ev_loop *loop;
 
     loop = ev_default_loop(0);
-    rdr = new_nsq_reader(loop, "test", "ch",
-        NULL, NULL, message_handler);
-    // nsq_reader_connect_to_nsqd(rdr, "127.0.0.1", 4150);
-    nsq_reader_add_nsqlookupd_endpoint(rdr, "127.0.0.1", 4161);
+    rdr = new_nsq_reader(loop, "test3", "ch",
+        NULL, NULL, message_handler
+        ,disconnect_handler
+        );
+    nsq_reader_connect_to_nsqd(rdr, "127.0.0.1", 4150);
+    //nsq_reader_add_nsqlookupd_endpoint(rdr, "127.0.0.1", 4161);
     nsq_run(loop);
 
     return 0;

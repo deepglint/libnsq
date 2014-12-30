@@ -8,7 +8,7 @@
 
 static void nsqd_connection_read_size(struct BufferedSocket *buffsock, void *arg);
 static void nsqd_connection_read_data(struct BufferedSocket *buffsock, void *arg);
-
+static void nsqd_connection_error_cb(struct BufferedSocket *buffsock, void *arg);
 static void nsqd_connection_connect_cb(struct BufferedSocket *buffsock, void *arg)
 {
     struct NSQDConnection *conn = (struct NSQDConnection *)arg;
@@ -89,10 +89,22 @@ static void nsqd_connection_close_cb(struct BufferedSocket *buffsock, void *arg)
     }
 }
 
+static void nsqd_reconnect(struct NSQDConnection *conn){
+    conn->bs = new_buffered_socket(conn->loop, conn->address, conn->port,
+        nsqd_connection_connect_cb, nsqd_connection_close_cb,
+        NULL, NULL, nsqd_connection_error_cb,
+        conn);
+}
+
+/*
+Using this function to tell the main process that the socket is disconnected
+*/
 static void nsqd_connection_error_cb(struct BufferedSocket *buffsock, void *arg)
 {
     struct NSQDConnection *conn = (struct NSQDConnection *)arg;
-
+    printf("reconnecting\n");
+    //nsqd_reconnect(conn);
+    conn->disconnect_callback(conn);
     _DEBUG("%s: conn %p\n", __FUNCTION__, conn);
 }
 
@@ -100,19 +112,22 @@ struct NSQDConnection *new_nsqd_connection(struct ev_loop *loop, const char *add
     void (*connect_callback)(struct NSQDConnection *conn, void *arg),
     void (*close_callback)(struct NSQDConnection *conn, void *arg),
     void (*msg_callback)(struct NSQDConnection *conn, struct NSQMessage *msg, void *arg),
+    void (*disconnect_callback)(struct NSQDConnection *conn),
     void *arg)
 {
     struct NSQDConnection *conn;
 
     conn = malloc(sizeof(struct NSQDConnection));
     conn->command_buf = new_buffer(4096, 4096);
+    conn->address=address;
+    conn->port=port;
     conn->current_msg_size = 0;
     conn->connect_callback = connect_callback;
     conn->close_callback = close_callback;
     conn->msg_callback = msg_callback;
-    conn->arg = arg;
+    conn->arg = arg;//the reader pointer
     conn->loop = loop;
-
+    conn->disconnect_callback=disconnect_callback;
     conn->bs = new_buffered_socket(loop, address, port,
         nsqd_connection_connect_cb, nsqd_connection_close_cb,
         NULL, NULL, nsqd_connection_error_cb,
@@ -120,6 +135,7 @@ struct NSQDConnection *new_nsqd_connection(struct ev_loop *loop, const char *add
 
     return conn;
 }
+
 
 void free_nsqd_connection(struct NSQDConnection *conn)
 {
@@ -138,4 +154,5 @@ int nsqd_connection_connect(struct NSQDConnection *conn)
 void nsqd_connection_disconnect(struct NSQDConnection *conn)
 {
     buffered_socket_close(conn->bs);
+    conn->disconnect_callback(conn);
 }

@@ -5,7 +5,7 @@
 #include <stdarg.h>
 #include <stdlib.h>
 #include <time.h>
-#include <utlist.h>
+#include "utlist.h"
 #include <ev.h>
 #include <evbuffsock.h>
 
@@ -25,12 +25,15 @@ struct NSQReader {
     void (*connect_callback)(struct NSQReader *rdr, struct NSQDConnection *conn);
     void (*close_callback)(struct NSQReader *rdr, struct NSQDConnection *conn);
     void (*msg_callback)(struct NSQReader *rdr, struct NSQDConnection *conn, struct NSQMessage *msg);
+    void (*disconnect_callback)(struct NSQReader *rdr,struct NSQDConnection *conn);
 };
 
 struct NSQReader *new_nsq_reader(struct ev_loop *loop, const char *topic, const char *channel,
     void (*connect_callback)(struct NSQReader *rdr, struct NSQDConnection *conn),
     void (*close_callback)(struct NSQReader *rdr, struct NSQDConnection *conn),
-    void (*msg_callback)(struct NSQReader *rdr, struct NSQDConnection *conn, struct NSQMessage *msg));
+    void (*msg_callback)(struct NSQReader *rdr, struct NSQDConnection *conn, struct NSQMessage *msg)
+    ,void (*disconnect_callback)(struct NSQReader *rdr,struct NSQDConnection *conn)
+    );
 void free_nsq_reader(struct NSQReader *rdr);
 int nsq_reader_connect_to_nsqd(struct NSQReader *rdr, const char *address, int port);
 int nsq_reader_add_nsqlookupd_endpoint(struct NSQReader *rdr, const char *address, int port);
@@ -42,11 +45,14 @@ struct NSQDConnection {
     struct Buffer *command_buf;
     uint32_t current_msg_size;
     uint32_t current_frame_type;
+    const char *address;
+    int port;
     char *current_data;
     struct ev_loop *loop;
     void (*connect_callback)(struct NSQDConnection *conn, void *arg);
     void (*close_callback)(struct NSQDConnection *conn, void *arg);
     void (*msg_callback)(struct NSQDConnection *conn, struct NSQMessage *msg, void *arg);
+    void (*disconnect_callback)(struct NSQDConnection *conn);
     void *arg;
     struct NSQDConnection *next;
 };
@@ -55,6 +61,7 @@ struct NSQDConnection *new_nsqd_connection(struct ev_loop *loop, const char *add
     void (*connect_callback)(struct NSQDConnection *conn, void *arg),
     void (*close_callback)(struct NSQDConnection *conn, void *arg),
     void (*msg_callback)(struct NSQDConnection *conn, struct NSQMessage *msg, void *arg),
+    void (*disconnect_callback)(struct NSQDConnection *conn),
     void *arg);
 void free_nsqd_connection(struct NSQDConnection *conn);
 int nsqd_connection_connect(struct NSQDConnection *conn);

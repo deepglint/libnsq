@@ -3,8 +3,8 @@ DESTDIR=
 LIBDIR=${PREFIX}/lib
 INCDIR=${PREFIX}/include
 
-CFLAGS+=-g -Wall -O2 -DDEBUG -fPIC
-LIBS=-lev -levbuffsock -lcurl -ljson-c
+CFLAGS+=-g -Wall -O2 -DDEBUG -fPIC -I $(INCDIR)
+LIBS= -lcurl /usr/local/lib/libevbuffsock.a /usr/local/lib/libev.a /usr/local/lib/libjson-c.a
 AR=ar
 AR_FLAGS=rc
 RANLIB=ranlib
@@ -21,7 +21,7 @@ libnsq.a: command.o reader.o nsqd_connection.o http.o message.o nsqlookupd.o
 	$(RANLIB) $@
 
 test: test.o libnsq.a
-	$(CC) -o $@ $^ $(LIBS)
+	$(CC) -o $@ $^ $(LIBS) -I $(INCDIR)
 
 clean:
 	rm -rf libnsq.a test test.dSYM *.o

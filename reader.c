@@ -55,61 +55,68 @@ static void nsq_reader_close_cb(struct NSQDConnection *conn, void *arg)
     free_nsqd_connection(conn);
 }
 
-void nsq_lookupd_request_cb(struct HttpRequest *req, struct HttpResponse *resp, void *arg);
-
-static void nsq_reader_lookupd_poll_cb(EV_P_ struct ev_timer *w, int revents)
-{
-    struct NSQReader *rdr = (struct NSQReader *)w->data;
-    struct NSQLookupdEndpoint *nsqlookupd_endpoint;
-    struct HttpRequest *req;
-    int i, idx, count = 0;
-    char buf[256];
-
-    LL_FOREACH(rdr->lookupd, nsqlookupd_endpoint) {
-        count++;
-    }
-    idx = rand() % count;
-
-    _DEBUG("%s: rdr %p (chose %d)\n", __FUNCTION__, rdr, idx);
-
-    i = 0;
-    LL_FOREACH(rdr->lookupd, nsqlookupd_endpoint) {
-        if (i++ == idx) {
-            sprintf(buf, "http://%s:%d/lookup?topic=%s", nsqlookupd_endpoint->address,
-                nsqlookupd_endpoint->port, rdr->topic);
-            req = new_http_request(buf, nsq_lookupd_request_cb, rdr);
-            http_client_get((struct HttpClient *)rdr->httpc, req);
-            break;
-        }
-    }
-
-    ev_timer_again(rdr->loop, &rdr->lookupd_poll_timer);
+static void nsq_conn_disconnct_cb(struct NSQDConnection *conn){
+    printf("nsq connection disconnected\n");
+    struct NSQReader *rdr = (struct NSQReader *)(conn->arg);
+    rdr->disconnect_callback(rdr,conn);
 }
+// void nsq_lookupd_request_cb(struct HttpRequest *req, struct HttpResponse *resp, void *arg);
+
+// static void nsq_reader_lookupd_poll_cb(EV_P_ struct ev_timer *w, int revents)
+// {
+//     struct NSQReader *rdr = (struct NSQReader *)w->data;
+//     struct NSQLookupdEndpoint *nsqlookupd_endpoint;
+//     struct HttpRequest *req;
+//     int i, idx, count = 0;
+//     char buf[256];
+
+//     LL_FOREACH(rdr->lookupd, nsqlookupd_endpoint) {
+//         count++;
+//     }
+//     idx = rand() % count;
+
+//     _DEBUG("%s: rdr %p (chose %d)\n", __FUNCTION__, rdr, idx);
+
+//     i = 0;
+//     LL_FOREACH(rdr->lookupd, nsqlookupd_endpoint) {
+//         if (i++ == idx) {
+//             sprintf(buf, "http://%s:%d/lookup?topic=%s", nsqlookupd_endpoint->address,
+//                 nsqlookupd_endpoint->port, rdr->topic);
+//             req = new_http_request(buf, nsq_lookupd_request_cb, rdr);
+//             http_client_get((struct HttpClient *)rdr->httpc, req);
+//             break;
+//         }
+//     }
+
+//     ev_timer_again(rdr->loop, &rdr->lookupd_poll_timer);
+// }
 
 struct NSQReader *new_nsq_reader(struct ev_loop *loop, const char *topic, const char *channel,
     void (*connect_callback)(struct NSQReader *rdr, struct NSQDConnection *conn),
     void (*close_callback)(struct NSQReader *rdr, struct NSQDConnection *conn),
-    void (*msg_callback)(struct NSQReader *rdr, struct NSQDConnection *conn, struct NSQMessage *msg))
+    void (*msg_callback)(struct NSQReader *rdr, struct NSQDConnection *conn, struct NSQMessage *msg),
+    void (*disconnect_callback)(struct NSQReader *rdr,struct NSQDConnection *conn))
 {
     struct NSQReader *rdr;
 
     rdr = malloc(sizeof(struct NSQReader));
     rdr->topic = strdup(topic);
     rdr->channel = strdup(channel);
-    rdr->max_in_flight = 1;
+    rdr->max_in_flight = 2500;
     rdr->connect_callback = connect_callback;
     rdr->close_callback = close_callback;
     rdr->msg_callback = msg_callback;
+    rdr->disconnect_callback=disconnect_callback;
     rdr->conns = NULL;
-    rdr->lookupd = NULL;
+    //rdr->lookupd = NULL;
     rdr->loop = loop;
 
     rdr->httpc = new_http_client(rdr->loop);
 
     // TODO: configurable interval
-    ev_timer_init(&rdr->lookupd_poll_timer, nsq_reader_lookupd_poll_cb, 0., 5.);
-    rdr->lookupd_poll_timer.data = rdr;
-    ev_timer_again(rdr->loop, &rdr->lookupd_poll_timer);
+    // ev_timer_init(&rdr->lookupd_poll_timer, nsq_reader_lookupd_poll_cb, 0., 0.);
+    // rdr->lookupd_poll_timer.data = rdr;
+    // ev_timer_again(rdr->loop, &rdr->lookupd_poll_timer);
 
     return rdr;
 }
@@ -117,7 +124,7 @@ struct NSQReader *new_nsq_reader(struct ev_loop *loop, const char *topic, const 
 void free_nsq_reader(struct NSQReader *rdr)
 {
     struct NSQDConnection *conn;
-    struct NSQLookupdEndpoint *nsqlookupd_endpoint;
+    //struct NSQLookupdEndpoint *nsqlookupd_endpoint;
 
     if (rdr) {
         // TODO: this should probably trigger disconnections and then keep
@@ -125,24 +132,24 @@ void free_nsq_reader(struct NSQReader *rdr)
         LL_FOREACH(rdr->conns, conn) {
             nsqd_connection_disconnect(conn);
         }
-        LL_FOREACH(rdr->lookupd, nsqlookupd_endpoint) {
-            free_nsqlookupd_endpoint(nsqlookupd_endpoint);
-        }
+        // LL_FOREACH(rdr->lookupd, nsqlookupd_endpoint) {
+        //     free_nsqlookupd_endpoint(nsqlookupd_endpoint);
+        // }
         free(rdr->topic);
         free(rdr->channel);
         free(rdr);
     }
 }
 
-int nsq_reader_add_nsqlookupd_endpoint(struct NSQReader *rdr, const char *address, int port)
-{
-    struct NSQLookupdEndpoint *nsqlookupd_endpoint;
+// int nsq_reader_add_nsqlookupd_endpoint(struct NSQReader *rdr, const char *address, int port)
+// {
+//     struct NSQLookupdEndpoint *nsqlookupd_endpoint;
 
-    nsqlookupd_endpoint = new_nsqlookupd_endpoint(address, port);
-    LL_APPEND(rdr->lookupd, nsqlookupd_endpoint);
+//     nsqlookupd_endpoint = new_nsqlookupd_endpoint(address, port);
+//     LL_APPEND(rdr->lookupd, nsqlookupd_endpoint);
 
-    return 1;
-}
+//     return 1;
+// }
 
 int nsq_reader_connect_to_nsqd(struct NSQReader *rdr, const char *address, int port)
 {
@@ -150,7 +157,7 @@ int nsq_reader_connect_to_nsqd(struct NSQReader *rdr, const char *address, int p
     int rc;
 
     conn = new_nsqd_connection(rdr->loop, address, port,
-        nsq_reader_connect_cb, nsq_reader_close_cb, nsq_reader_msg_cb, rdr);
+        nsq_reader_connect_cb, nsq_reader_close_cb, nsq_reader_msg_cb, nsq_conn_disconnct_cb,rdr);
     rc = nsqd_connection_connect(conn);
     if (rc > 0) {
         LL_APPEND(rdr->conns, conn);
