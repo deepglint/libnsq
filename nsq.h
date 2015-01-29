@@ -12,14 +12,15 @@
 enum {NSQ_FRAME_TYPE_RESPONSE, NSQ_FRAME_TYPE_ERROR, NSQ_FRAME_TYPE_MESSAGE} frame_type;
 struct NSQDConnection;
 struct NSQMessage;
-
+//ev_timer timeoutWatcher;
 struct NSQReader {
     char *topic;
     char *channel;
     int max_in_flight;
     struct NSQDConnection *conns;
-    struct NSQLookupdEndpoint *lookupd;
-    struct ev_timer lookupd_poll_timer;
+    //struct NSQLookupdEndpoint *lookupd;
+    //struct ev_timer lookupd_poll_timer;
+    struct ev_timer heartbeatTimer;
     struct ev_loop *loop;
     void *httpc;
     void (*connect_callback)(struct NSQReader *rdr, struct NSQDConnection *conn);

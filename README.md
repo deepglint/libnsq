@@ -23,6 +23,7 @@ TODO:
 [2]: http://software.schmorp.de/pkg/libev
 [3]: https://github.com/mreiferson/libevbuffsock
 
+----------------------------Huangyan9188--------------------
 on the MAC OSX
 if you cannot build the test demo
 using following
@@ -30,3 +31,12 @@ ar rc libnsq.a command.o reader.o nsqd_connection.o http.o message.o nsqlookupd.
 ranlib libnsq.a
 cc -o test.o -c test.c -g -Wall -O2 -DDEBUG -fPIC
 cc -o test test.o libnsq.a -lcurl /usr/local/lib/libevbuffsock.a /usr/local/lib/libev.a /usr/local/lib/libjson-c.a
+
+----------------------------OR------------------------------
+Just checkout the Makefile, You need to know that the dependencies are
+libev
+libjson-c
+libevbuffsock
+libcurl
+
+Please set these ldconfig, or just point out the .a library file

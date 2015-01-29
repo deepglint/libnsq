@@ -91,6 +91,23 @@ static void nsq_conn_disconnct_cb(struct NSQDConnection *conn){
 //     ev_timer_again(rdr->loop, &rdr->lookupd_poll_timer);
 // }
 
+static void nsqd_connection_heartbeat(struct NSQDConnection* conn){
+    if(conn->command_buf->offset==0){
+        buffer_reset(conn->command_buf);
+        nsq_nop(conn->command_buf);
+        buffered_socket_write_buffer(conn->bs, conn->command_buf);
+    }
+    return;
+}
+static void nsq_heartbeat_cb(EV_P_ struct ev_timer *w,int revents){
+    printf("heartbeating\n");
+    struct NSQDConnection *conn;
+    struct NSQReader *rdr=(struct NSQReader*) w->data;
+    LL_FOREACH(rdr->conns, conn) {
+        nsqd_connection_heartbeat(conn);
+    }
+    ev_timer_again(rdr->loop,w);
+}
 struct NSQReader *new_nsq_reader(struct ev_loop *loop, const char *topic, const char *channel,
     void (*connect_callback)(struct NSQReader *rdr, struct NSQDConnection *conn),
     void (*close_callback)(struct NSQReader *rdr, struct NSQDConnection *conn),
@@ -102,7 +119,7 @@ struct NSQReader *new_nsq_reader(struct ev_loop *loop, const char *topic, const 
     rdr = malloc(sizeof(struct NSQReader));
     rdr->topic = strdup(topic);
     rdr->channel = strdup(channel);
-    rdr->max_in_flight = 2500;
+    rdr->max_in_flight = 1;
     rdr->connect_callback = connect_callback;
     rdr->close_callback = close_callback;
     rdr->msg_callback = msg_callback;
@@ -112,7 +129,10 @@ struct NSQReader *new_nsq_reader(struct ev_loop *loop, const char *topic, const 
     rdr->loop = loop;
 
     rdr->httpc = new_http_client(rdr->loop);
-
+    printf("adding heartbeat rule\n");
+    ev_timer_init(&rdr->heartbeatTimer,nsq_heartbeat_cb,10,0.);
+    rdr->heartbeatTimer.data=rdr;
+    ev_timer_again(rdr->loop,&rdr->heartbeatTimer);
     // TODO: configurable interval
     // ev_timer_init(&rdr->lookupd_poll_timer, nsq_reader_lookupd_poll_cb, 0., 0.);
     // rdr->lookupd_poll_timer.data = rdr;
@@ -120,6 +140,12 @@ struct NSQReader *new_nsq_reader(struct ev_loop *loop, const char *topic, const 
 
     return rdr;
 }
+
+
+// void heartbeat_cb (EV_P_ ev_timer *w, int revents){
+//    printf("need to heartbeat\n");
+//    ev_timer_again(rdr->loop,w);
+// }
 
 void free_nsq_reader(struct NSQReader *rdr)
 {
@@ -151,6 +177,7 @@ void free_nsq_reader(struct NSQReader *rdr)
 //     return 1;
 // }
 
+//MEANS YOU CAN HAVE MULTICONNECTION
 int nsq_reader_connect_to_nsqd(struct NSQReader *rdr, const char *address, int port)
 {
     struct NSQDConnection *conn;
@@ -164,6 +191,8 @@ int nsq_reader_connect_to_nsqd(struct NSQReader *rdr, const char *address, int p
     }
     return rc;
 }
+
+
 
 void nsq_run(struct ev_loop *loop)
 {

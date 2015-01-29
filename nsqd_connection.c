@@ -52,16 +52,20 @@ static void nsqd_connection_read_data(struct BufferedSocket *buffsock, void *arg
     buffer_drain(buffsock->read_buf, 4);
     conn->current_msg_size -= 4;
 
-    _DEBUG("%s: frame type %d, data: %.*s\n", __FUNCTION__, conn->current_frame_type,
+    printf("%s: frame type %d, data: %.*s\n", __FUNCTION__, conn->current_frame_type,
         conn->current_msg_size, buffsock->read_buf->data);
 
     conn->current_data = buffsock->read_buf->data;
     switch (conn->current_frame_type) {
         case NSQ_FRAME_TYPE_RESPONSE:
             if (strncmp(conn->current_data, "_heartbeat_", 11) == 0) {
+                printf("get the heartbeat signal\n");
                 buffer_reset(conn->command_buf);
                 nsq_nop(conn->command_buf);
                 buffered_socket_write_buffer(conn->bs, conn->command_buf);
+                buffer_drain(buffsock->read_buf, 11);
+
+                buffered_socket_read_bytes(buffsock, 4, nsqd_connection_read_size, conn);
                 return;
             }
             break;
@@ -77,6 +81,8 @@ static void nsqd_connection_read_data(struct BufferedSocket *buffsock, void *arg
 
     buffered_socket_read_bytes(buffsock, 4, nsqd_connection_read_size, conn);
 }
+
+
 
 static void nsqd_connection_close_cb(struct BufferedSocket *buffsock, void *arg)
 {
@@ -102,7 +108,7 @@ Using this function to tell the main process that the socket is disconnected
 static void nsqd_connection_error_cb(struct BufferedSocket *buffsock, void *arg)
 {
     struct NSQDConnection *conn = (struct NSQDConnection *)arg;
-    printf("reconnecting\n");
+    //printf("reconnecting\n");
     //nsqd_reconnect(conn);
     conn->disconnect_callback(conn);
     _DEBUG("%s: conn %p\n", __FUNCTION__, conn);

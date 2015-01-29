@@ -38,6 +38,8 @@ void nsq_requeue(struct Buffer *buf, const char *id, int timeout_ms)
 }
 
 void nsq_nop(struct Buffer *buf)
-{
-    buffer_add(buf, "NOP\n", 4);
+{   char b[10];
+    size_t n;
+    n=sprintf(b,"NOP\n");
+    buffer_add(buf,b, n);
 }
