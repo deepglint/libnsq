@@ -32,7 +32,7 @@ int main(int argc, char **argv)
     struct ev_loop *loop;
 
     loop = ev_default_loop(0);
-    rdr1 = new_nsq_reader(loop, "test3", "ch",
+    rdr1 = new_nsq_reader(loop, "sensor_response_to_any_listener_chan", "ch",
         NULL, NULL, message_handler
         ,disconnect_handler
         );
@@ -40,8 +40,8 @@ int main(int argc, char **argv)
     //     NULL, NULL, message_handler
     //     ,disconnect_handler
     //     );
-    nsq_reader_connect_to_nsqd(rdr1, "127.0.0.1", 4150);
-    //nsq_reader_connect_to_nsqd(rdr2, "127.0.0.1", 4150);
+    nsq_reader_connect_to_nsqd(rdr1, "192.168.2.100", 4150);
+    //nsq_reader_connect_to_nsqd(rdr2, "192.168.2.100", 4150);
     //nsq_reader_add_nsqlookupd_endpoint(rdr, "127.0.0.1", 4161);
     nsq_run(loop);
 
